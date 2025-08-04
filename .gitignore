@@ -1,0 +1,5 @@
+nuwa
+.history
+*.DS_Store
+/vendor/
+*.txt
