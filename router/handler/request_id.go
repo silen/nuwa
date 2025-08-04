@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	nuwa "github.com/silen/nuwa"
-	"github.com/silen/nuwa/pkg/httpx"
 	"github.com/silen/nuwa/pkg/logs"
+	nwHttp "github.com/silen/nuwa/pkg/nwHttp"
 	"github.com/silen/nuwa/pkg/tools"
 )
 
@@ -43,7 +43,7 @@ func RequestID() gin.HandlerFunc {
 		c.Next()
 
 		logs.WithContext(c).Trace("["+fmt.Sprintf("%f", time.Since(timeStart).Seconds())+"] URL:["+c.Request.Method+"]"+c.Request.Host+c.Request.URL.Path+" | clientIP："+c.ClientIP()+
-			" | header：", c.Request.Header, " | params：", c.Request.Form, " | json：", httpx.CompressStr(string(str)))
+			" | header：", c.Request.Header, " | params：", c.Request.Form, " | json：", nwHttp.CompressStr(string(str)))
 
 	}
 }
