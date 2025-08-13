@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net"
-	"os"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -72,17 +71,8 @@ func MapToMD5Key(data any) string {
 }
 
 // 服务名称 如 cdp-system
-func InternalDomain(app string) string {
-	if os.Getenv("environment") == "" {
-		host := conf.Config.GetString("apiHost")
-		if host == "" {
-			host = "https://cdp-api-dev.1.cc"
-		}
-
-		return host + "/" + app
-	}
-	//k8s 使用！
-	return "http://" + app + ":80"
+func InternalDomain() string {
+	return conf.Config.GetString("apiHost")
 }
 
 // 小数点几位 使用方法

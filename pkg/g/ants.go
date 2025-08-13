@@ -60,7 +60,7 @@ case:
 		//maps.Store(, value any)
 	})
 */
-func ExecTaskByGoroutine(ctx context.Context, params []any, execFunc func(any), args ...any) (err error) {
+func ExecTaskByGoroutine[T any](ctx context.Context, params []T, execFunc func(T), args ...any) (err error) {
 	//pool .... how do you do!!!!
 	var wg sync.WaitGroup
 	size := 10
@@ -99,7 +99,7 @@ func ExecTaskByGoroutine(ctx context.Context, params []any, execFunc func(any), 
 }
 
 // 某个任务失败 那么不等待其他任务 推出返回主线程
-func ExecTaskByGoroutineErrorEnd(ctx context.Context, params []any, execFunc func(any) error, args ...any) (err error) {
+func ExecTaskByGoroutineErrorEnd[T any](ctx context.Context, params []T, execFunc func(T) error, args ...any) (err error) {
 	poolNum := 15
 	if len(args) > 0 {
 		poolNum = cast.ToInt(args[0])
