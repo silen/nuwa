@@ -2,11 +2,13 @@ package g
 
 import (
 	"context"
+	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
 
 	"github.com/silen/nuwa/pkg/logs"
 )
@@ -53,7 +55,7 @@ case:
 	//var maps sync.Map{}
 	var rows []any
 	var mutex sync.Mutex
-	g.ExecTaskByGoroutine(ctx, ccc, func(i any) {
+	g.ExecTaskByGoroutine(ctx, ccc, func(i T) {
 		mutex.Lock()
 		rows = append(rows, i)
 		mutex.Unlock()
@@ -72,6 +74,8 @@ func ExecTaskByGoroutine[T any](ctx context.Context, params []T, execFunc func(T
 		ExpiryDuration: 30 * time.Second,
 		PanicHandler: func(i any) {
 			logs.WithContext(ctx).Error("ants goroutine fatal error========", i)
+			stack := string(debug.Stack())
+			logs.WithContext(ctx).Error(zap.String("debug_stack", stack))
 		},
 	}
 
@@ -111,6 +115,8 @@ func ExecTaskByGoroutineErrorEnd[T any](ctx context.Context, params []T, execFun
 		ExpiryDuration: 30 * time.Second,
 		PanicHandler: func(i any) {
 			logs.WithContext(ctx).Error("ants goroutine fatal error========", i)
+			stack := string(debug.Stack())
+			logs.WithContext(ctx).Error(zap.String("debug_stack", stack))
 		},
 	}
 	p, err := ants.NewPoolWithFunc(poolNum, func(i any) {
