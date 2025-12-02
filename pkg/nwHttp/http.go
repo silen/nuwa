@@ -1,8 +1,11 @@
 package nwHttp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"mime/multipart"
 	"os"
 	"strings"
 	"time"
@@ -184,4 +187,71 @@ func CompressStr(str string) string {
 	str = strings.Replace(str, "\n", "", -1)
 	str = strings.Replace(str, "\t", "", -1)
 	return strings.Replace(str, "\r", "", -1)
+}
+
+type UploadFileStruct struct {
+	Status int `json:"status"`
+	Data   struct {
+		Ext  string  `json:"ext"`
+		Path string  `json:"path"`
+		Size float64 `json:"size"`
+		Src  string  `json:"src"`
+	} `json:"data"`
+	Message string `json:"message"`
+}
+
+func UploadFile(url string, rc io.Reader, fieldName string) (res UploadFileStruct, err error) {
+	logs.Info(url)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// 写入文件字段
+	part, err := writer.CreateFormFile("file", fieldName)
+	if err != nil {
+		panic(err)
+	}
+
+	file, err := ReaderToTempFile(rc)
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove(file.Name()) // 用完删除
+	defer file.Close()
+	_, err = file.WriteTo(part)
+	if err != nil {
+		panic(err)
+	}
+
+	writer.Close()
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.SetRequestURI(url)
+	req.Header.SetMethod("POST")
+	req.Header.SetContentType(writer.FormDataContentType())
+	req.SetBody(body.Bytes())
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	if err := fasthttp.Do(req, resp); err != nil {
+		return res, err
+	}
+
+	err = tools.JsonStringToAny(string(resp.Body()), &res)
+	return res, err
+}
+func ReaderToTempFile(r io.Reader) (*os.File, error) {
+	tmpFile, err := os.CreateTemp("", "reader-*")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := io.Copy(tmpFile, r); err != nil {
+		tmpFile.Close()
+		return nil, err
+	}
+
+	tmpFile.Seek(0, io.SeekStart)
+	return tmpFile, nil
 }
