@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -107,12 +108,120 @@ var Trans ut.Translator
 func (v *defaultValidator) lazyinit() {
 	v.once.Do(func() {
 		validate := validator.New()
+
+		// 注册自定义验证器
+		registerCustomValidators(validate)
+
 		chinese := zh.New()
 		uni := ut.New(chinese, chinese)
 		Trans, _ = uni.GetTranslator("zh_CN")
+
+		// 注册中文翻译
 		zhTranslations.RegisterDefaultTranslations(validate, Trans)
+		registerCustomTranslations(validate, Trans)
 
 		v.validate = validate
 		v.validate.SetTagName("binding")
+	})
+}
+
+// registerCustomValidators 注册自定义验证器
+func registerCustomValidators(validate *validator.Validate) {
+	// 手机号验证
+	validate.RegisterValidation("mobile", validateMobile)
+
+	// 身份证号验证
+	validate.RegisterValidation("idcard", validateIDCard)
+
+	// IP地址验证
+	validate.RegisterValidation("ipaddr", validateIPAddr)
+
+	// MAC地址验证
+	validate.RegisterValidation("mac", validateMAC)
+
+	// 中文验证
+	validate.RegisterValidation("chinese", validateChinese)
+}
+
+// validateMobile 验证手机号
+func validateMobile(fl validator.FieldLevel) bool {
+	mobile := fl.Field().String()
+	// 匹配中国大陆手机号格式
+	reg := regexp.MustCompile(`^1[3-9]\d{9}$`)
+	return reg.MatchString(mobile)
+}
+
+// validateIDCard 验证身份证号
+func validateIDCard(fl validator.FieldLevel) bool {
+	idcard := fl.Field().String()
+	// 简单验证身份证格式（18位）
+	reg := regexp.MustCompile(`^[1-9]\d{5}(18|19|20)\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$`)
+	return reg.MatchString(idcard)
+}
+
+// validateIPAddr 验证IP地址
+func validateIPAddr(fl validator.FieldLevel) bool {
+	ip := fl.Field().String()
+	// 验证IPv4地址格式
+	reg := regexp.MustCompile(`^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`)
+	return reg.MatchString(ip)
+}
+
+// validateMAC 验证MAC地址
+func validateMAC(fl validator.FieldLevel) bool {
+	mac := fl.Field().String()
+	// 验证MAC地址格式
+	reg := regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
+	return reg.MatchString(mac)
+}
+
+// validateChinese 验证纯中文
+func validateChinese(fl validator.FieldLevel) bool {
+	text := fl.Field().String()
+	// 验证是否只包含中文字符
+	reg := regexp.MustCompile(`^[\u4e00-\u9fa5]+$`)
+	return reg.MatchString(text)
+}
+
+// registerCustomTranslations 注册自定义翻译
+func registerCustomTranslations(validate *validator.Validate, trans ut.Translator) {
+	// 手机号验证翻译
+	validate.RegisterTranslation("mobile", trans, func(ut ut.Translator) error {
+		return ut.Add("mobile", "{0}不是有效的手机号", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("mobile", fe.Field())
+		return t
+	})
+
+	// 身份证验证翻译
+	validate.RegisterTranslation("idcard", trans, func(ut ut.Translator) error {
+		return ut.Add("idcard", "{0}不是有效的身份证号", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("idcard", fe.Field())
+		return t
+	})
+
+	// IP地址验证翻译
+	validate.RegisterTranslation("ipaddr", trans, func(ut ut.Translator) error {
+		return ut.Add("ipaddr", "{0}不是有效的IP地址", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("ipaddr", fe.Field())
+		return t
+	})
+
+	// MAC地址验证翻译
+	validate.RegisterTranslation("mac", trans, func(ut ut.Translator) error {
+		return ut.Add("mac", "{0}不是有效的MAC地址", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("mac", fe.Field())
+		return t
+	})
+
+	// 中文验证翻译
+	validate.RegisterTranslation("chinese", trans, func(ut ut.Translator) error {
+		return ut.Add("chinese", "{0}应该只包含中文字符", true)
+	}, func(ut ut.Translator, fe validator.FieldError) string {
+		t, _ := ut.T("chinese", fe.Field())
+		return t
 	})
 }

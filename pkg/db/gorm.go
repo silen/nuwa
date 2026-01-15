@@ -71,6 +71,12 @@ func Mysql(ctx context.Context, config Config) (db *gorm.DB, err error) {
 		return
 	}
 
+	// 应用默认连接池配置
+	if err := ApplyDefaultPoolConfig(db); err != nil {
+		logs.WithContext(ctx).Error("apply mysql pool config error :", err.Error())
+		return nil, err
+	}
+
 	if len(config.Slave) > 0 {
 		replicas := []gorm.Dialector{}
 		for _, s := range config.Slave {
@@ -82,29 +88,24 @@ func Mysql(ctx context.Context, config Config) (db *gorm.DB, err error) {
 
 		db.Use(
 			dbresolver.Register(dbresolver.Config{
-				Sources: []gorm.Dialector{mysql.New(mysql.Config{
-					DSN: config.Master,
-				})},
+				Sources:  []gorm.Dialector{mysql.New(mysql.Config{DSN: config.Master})},
 				Replicas: replicas,
 				Policy:   dbresolver.RandomPolicy{},
-			}).
-				SetMaxIdleConns(10).
-				SetConnMaxLifetime(time.Hour).
-				SetMaxOpenConns(200),
+			}),
 		)
 	}
 
 	return
 }
 
-// mysql 连接
+// SQLServer 连接
 func SQLServer(ctx context.Context, config Config) (db *gorm.DB, err error) {
 
 	db, err = gorm.Open(sqlserver.Open(config.Master), &gorm.Config{
 		Logger:                 withCtxLogs(config.PrintSql),
 		SkipDefaultTransaction: false,
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   conf.Config.GetString("mysql.prefix"),
+			TablePrefix:   conf.Config.GetString("sqlserver.prefix"),
 			SingularTable: true,
 		},
 		NowFunc: func() time.Time {
@@ -116,26 +117,27 @@ func SQLServer(ctx context.Context, config Config) (db *gorm.DB, err error) {
 		return
 	}
 
+	// 应用默认连接池配置
+	if err := ApplyDefaultPoolConfig(db); err != nil {
+		logs.WithContext(ctx).Error("apply sqlserver pool config error :", err.Error())
+		return nil, err
+	}
+
 	if len(config.Slave) > 0 {
 		replicas := []gorm.Dialector{}
 		for _, s := range config.Slave {
-			cfg := mysql.Config{
+			cfg := sqlserver.Config{
 				DSN: s,
 			}
-			replicas = append(replicas, mysql.New(cfg))
+			replicas = append(replicas, sqlserver.New(cfg))
 		}
 
 		db.Use(
 			dbresolver.Register(dbresolver.Config{
-				Sources: []gorm.Dialector{mysql.New(mysql.Config{
-					DSN: config.Master,
-				})},
+				Sources:  []gorm.Dialector{sqlserver.New(sqlserver.Config{DSN: config.Master})},
 				Replicas: replicas,
 				Policy:   dbresolver.RandomPolicy{},
-			}).
-				SetMaxIdleConns(10).
-				SetConnMaxLifetime(time.Hour).
-				SetMaxOpenConns(200),
+			}),
 		)
 	}
 
@@ -155,13 +157,23 @@ func ClickHouse(ctx context.Context, config ck.ClickHouseConfig) (db *gorm.DB, e
 		Logger:                 withCtxLogs(config.PrintSql),
 		SkipDefaultTransaction: false,
 		NamingStrategy: schema.NamingStrategy{
-			TablePrefix:   conf.Config.GetString("mysql.prefix"),
+			TablePrefix:   conf.Config.GetString("clickhouse.prefix"),
 			SingularTable: true,
 		},
 		NowFunc: func() time.Time {
 			return time.Now().Local()
 		},
 	})
+	if err != nil {
+		logs.WithContext(ctx).Error("clickhouse conn error :", err.Error())
+		return
+	}
+
+	// 应用默认连接池配置
+	if err := ApplyDefaultPoolConfig(db); err != nil {
+		logs.WithContext(ctx).Error("apply clickhouse pool config error :", err.Error())
+		return nil, err
+	}
 
 	return
 }
