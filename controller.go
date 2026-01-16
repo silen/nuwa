@@ -21,7 +21,7 @@ type Controller struct {
 
 func (c *Controller) WithContent(ctx *gin.Context) {
 	c.ctx = ctx
-	c.Logs = logs.WithGinContext(ctx)
+	c.Logs = logs.WithContext(ctx)
 }
 
 func (c *Controller) GetCtx() (ctx context.Context) {

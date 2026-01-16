@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -16,11 +17,10 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/golang-module/carbon/v2"
 	"github.com/spf13/cast"
+	"go.uber.org/zap"
 
-	"github.com/silen/nuwa/pkg/cache"
 	"github.com/silen/nuwa/pkg/conf"
 	"github.com/silen/nuwa/pkg/logs"
-	"github.com/silen/nuwa/pkg/middleware"
 )
 
 var (
@@ -37,7 +37,6 @@ func Engine() {
 
 	ginEngine = gin.New()
 	ginEngine.Use(gin.Recovery())
-	ginEngine.Use(logs.RequestIDMiddleware()) // 添加请求ID中间件
 	ginEngine.NoRoute(go404)
 
 	runMode := gin.DebugMode
@@ -117,10 +116,7 @@ func Run() {
 
 	initTimeFunc()
 
-	// 初始化缓存
-	cache.InitCache()
-
-	serverConf := conf.GetStringMapString("server")
+	serverConf := conf.Config.GetStringMapString("server")
 	if cast.ToString(serverConf["port"]) == "" {
 		logs.Fatal("配置文件缺失服务端口")
 		return
@@ -128,19 +124,8 @@ func Run() {
 
 	addr := serverConf["host"] + ":" + serverConf["port"]
 
-	// 注册中间件
-	ginEngine.Use(middleware.CompressionMiddleware()) // 压缩中间件应该放在前面
-	ginEngine.Use(middleware.PerformanceMonitor())
-	ginEngine.Use(middleware.MetricsMiddleware())
-
-	// 注册健康检查和指标端点
-	ginEngine.GET("/checkHealth", middleware.HealthCheck)
-	ginEngine.GET("/metrics", middleware.MetricsEndpoint)
-	ginEngine.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-			"status":  "healthy",
-		})
+	ginEngine.GET("/checkHealth", func(ginC *gin.Context) {
+		ginC.String(200, "ok")
 	})
 
 	srv := &http.Server{
@@ -154,19 +139,12 @@ func Run() {
 		}
 	}()
 
-	logs.Info("服务启动成功，PID：", os.Getpid(), " address：", addr, " 当前环境：", os.Getenv("environment"))
+	logs.Info("服务启动成功，PID：", os.Getegid(), " address：", addr, " 当前环境：", os.Getenv("environment"))
 	// 等待中断信号以优雅地关闭服务器（设置 5 秒的超时时间）
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 	logs.Info("Shutdown Server ...")
-
-	// 关闭缓存连接
-	if cache.GetCache() != nil {
-		if err := cache.GetCache().Close(); err != nil {
-			logs.Error("Failed to close cache: ", err)
-		}
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -191,46 +169,33 @@ func RecoverPanic(ctx *gin.Context) {
 		if err == errAbort {
 			return
 		}
-
 		errString := fmt.Sprintf("%s", err)
 		if strings.Contains(errString, "write: broken pipe") {
-			xLogs.Warn("Broken pipe error: ", errString)
-			xLogs.Warn("Request URL: ", ctx.Request.URL.RequestURI())
+			xLogs.Warn(errString)
+			xLogs.Warn("the broken pipe request url is ", ctx.Request.URL.RequestURI())
 			return
 		}
 
-		// 记录详细的错误信息
-		xLogs.Error("Panic occurred in handler")
-		xLogs.Error("Request URL: ", ctx.Request.URL.RequestURI())
-		xLogs.Error("Request Method: ", ctx.Request.Method)
-		xLogs.Error("Request Headers: ", ctx.Request.Header)
-
-		// 获取查询参数和表单参数
-		params := ctx.Request.URL.Query()
-		if len(params) > 0 {
-			xLogs.Error("Query Params: ", params)
+		//var stack string
+		xLogs.Error("the request url is ", ctx.Request.URL.RequestURI(), ctx.Request.Method)
+		xLogs.Error("the request params are ", ctx.Request.Form)
+		xLogs.Error("Handler crashed with error", err)
+		for i := 1; ; i++ {
+			_, file, line, ok := runtime.Caller(i)
+			if !ok {
+				break
+			}
+			xLogs.Error(fmt.Sprintf("%s:%d", file, line))
+			//因为kibana的日志是按换行符分隔的，所以stack打在生产也用不了
+			//stack = fmt.Sprintln(stack + fmt.Sprintf("%s:%d", file, line))
 		}
-
-		// 注意：这里不直接读取请求体以避免影响后续中间件或处理器
-		// 可以记录请求长度等信息
-		if ctx.Request.ContentLength > 0 {
-			xLogs.Error("Request Content Length: ", ctx.Request.ContentLength)
-		}
-
-		xLogs.Error("Panic Error: ", err)
-
-		// 记录调用栈
+		//xLogs.Error(ctx, stack)
 		stack := string(debug.Stack())
-		xLogs.Error("Stack trace: ", stack)
-
-		// 如果上下文已经被写入，则不再尝试写入响应
-		if ctx.IsAborted() {
-			return
-		}
-
+		xLogs.Error(zap.String("debug_stack", stack))
 		ctx.JSON(500, map[string]any{
 			"status":  SYSTEM_ERROR,
-			"message": "Internal server error",
+			"message": "internal server error",
 		})
+
 	}
 }
