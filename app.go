@@ -38,9 +38,9 @@ func Engine() {
 	ginEngine.Use(gin.Recovery())
 	ginEngine.NoRoute(go404)
 
-	runMode := gin.DebugMode
-	if os.Getenv("environment") == "prod" {
-		runMode = gin.ReleaseMode
+	runMode := gin.ReleaseMode
+	if os.Getenv("environment") == "dev" {
+		runMode = gin.DebugMode
 	}
 
 	gin.SetMode(runMode)

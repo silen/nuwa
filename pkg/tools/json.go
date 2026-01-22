@@ -13,7 +13,7 @@ func JsonStringToAny(jsonStr string, out any) (err error) {
 }
 
 // StructToStruct 从目标struct装载数据进另一个struct
-func StructToStruct(from, to interface{}) error {
+func Struct2Any(from, to any) error {
 	str, err := json.Marshal(from)
 	if err != nil {
 		return err

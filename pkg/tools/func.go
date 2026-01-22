@@ -11,7 +11,6 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/spf13/cast"
 
-	"github.com/silen/nuwa/pkg/conf"
 	"github.com/silen/nuwa/pkg/logs"
 )
 
@@ -68,11 +67,6 @@ func MapToMD5Key(data any) string {
 	content, _ := json.Marshal(data)
 	return MD5(string(content))
 
-}
-
-// 服务名称 如 cdp-system
-func InternalDomain() string {
-	return conf.Config.GetString("apiHost")
 }
 
 // 小数点几位 使用方法

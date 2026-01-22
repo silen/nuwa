@@ -48,7 +48,7 @@ func Default() *Pool {
 	options := ants.Options{
 		ExpiryDuration: ExpiryDuration,
 		Nonblocking:    Nonblocking,
-		PanicHandler: func(i interface{}) {
+		PanicHandler: func(i any) {
 			logs.WithContext(context.TODO()).Error(string(debug.Stack()))
 			logs.WithContext(context.TODO()).Error("ants goroutine fatal error========", i)
 		},

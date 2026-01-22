@@ -201,28 +201,27 @@ type UploadFileStruct struct {
 }
 
 func UploadFile(url string, rc io.Reader, fieldName string) (res UploadFileStruct, err error) {
-	logs.Info(url)
+
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-
+	defer writer.Close()
 	// 写入文件字段
 	part, err := writer.CreateFormFile("file", fieldName)
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	file, err := ReaderToTempFile(rc)
 	if err != nil {
-		panic(err)
+		return
 	}
 	defer os.Remove(file.Name()) // 用完删除
 	defer file.Close()
+
 	_, err = file.WriteTo(part)
 	if err != nil {
-		panic(err)
+		return
 	}
-
-	writer.Close()
 
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
