@@ -69,6 +69,7 @@ if err != nil {
 
 5. Logging
 	•	Use the existing logging utilities in this repository
+	•	The canonical logging package name and import path is `logs` / `github.com/silen/nuwa/logs`
 	•	Do not introduce new logging frameworks
 	•	Logs should be:
 	•	Context-aware
@@ -246,6 +247,9 @@ Avoid:
 	•	Large-scale rewrites
 	•	Renaming files, packages, or exported APIs
 	•	Introducing new dependencies without strong justification
+
+Exception:
+	•	If the user explicitly requests a naming alignment or package rename, make the smallest consistent change set and update these constraints or related docs when needed
 
 Communication Expectations
 
